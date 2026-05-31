@@ -219,3 +219,19 @@ __marimo__/
 
 # Data files
 data/*
+
+# macOS
+.DS_Store
+
+# MLflow
+mlruns/
+
+# ChromaDB
+chroma_db/
+
+# datos y modelos descargados
+data/sample_pdfs/
+*.pdf
+
+# UV lock
+uv.lock
