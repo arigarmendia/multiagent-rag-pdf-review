@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "validators": {
+    "guardrails/detect_pii": {
+      "import_path": "guardrails_grhub_detect_pii",
+      "exports": [
+        "DetectPII"
+      ],
+      "installed_at": "2026-06-08T01:32:37.894327+00:00",
+      "package_name": "guardrails-grhub-detect-pii"
+    },
+    "guardrails/provenance_llm": {
+      "import_path": "guardrails_grhub_provenance_llm",
+      "exports": [
+        "ProvenanceLLM"
+      ],
+      "installed_at": "2026-06-08T01:33:22.856023+00:00",
+      "package_name": "guardrails-grhub-provenance-llm"
+    },
+    "guardrails/gibberish_text": {
+      "import_path": "guardrails_grhub_gibberish_text",
+      "exports": [
+        "GibberishText"
+      ],
+      "installed_at": "2026-06-08T01:40:14.895577+00:00",
+      "package_name": "guardrails-grhub-gibberish-text"
+    },
+    "guardrails/secrets_present": {
+      "import_path": "guardrails_grhub_secrets_present",
+      "exports": [
+        "SecretsPresent"
+      ],
+      "installed_at": "2026-06-08T01:40:34.908762+00:00",
+      "package_name": "guardrails-grhub-secrets-present"
+    }
+  }
+}

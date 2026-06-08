@@ -1,8 +1,8 @@
 import pdfplumber
+import mlflow
+import time
 from pydantic import BaseModel
 
-# Márgenes definidos en MastersDoctoralThesis.cls (en puntos PDF)
-# 1 cm = 28.35 puntos
 CM_TO_PT = 28.35
 
 MARGINS = {
@@ -20,7 +20,9 @@ class LayoutError(BaseModel):
     element: str
 
 
+@mlflow.trace(name="layout_analyzer")
 def check_margins(pdf_path: str) -> list[LayoutError]:
+    start_time = time.time()
     errors = []
 
     with pdfplumber.open(pdf_path) as pdf:
@@ -40,7 +42,7 @@ def check_margins(pdf_path: str) -> list[LayoutError]:
                 y0 = obj.get("y0", 0)
                 y1 = obj.get("y1", 0)
 
-                if x0 < content_left or x1 > content_right:
+                if x0 < content_left - 2.0 or x1 > content_right + 2.0:
                     errors.append(LayoutError(
                         page_number=page_number,
                         error_type="margen horizontal",
@@ -48,12 +50,23 @@ def check_margins(pdf_path: str) -> list[LayoutError]:
                         element=obj.get("object_type", "elemento")
                     ))
 
-                if y0 < content_top or y1 > content_bottom:
+                if y0 < content_top - 2.0 or y1 > content_bottom + 2.0:
                     errors.append(LayoutError(
                         page_number=page_number,
                         error_type="margen vertical",
                         description=f"Elemento fuera del margen vertical (y0={y0:.1f}, y1={y1:.1f}, permitido={content_top:.1f}-{content_bottom:.1f})",
                         element=obj.get("object_type", "elemento")
                     ))
+
+    latency = time.time() - start_time
+
+    span = mlflow.get_current_active_span()
+    if span:
+        span.set_attributes({
+            "total_margin_errors": len(errors),
+            "horizontal_errors": len([e for e in errors if e.error_type == "margen horizontal"]),
+            "vertical_errors": len([e for e in errors if e.error_type == "margen vertical"]),
+            "layout_latency_seconds": round(latency, 2)
+        })
 
     return errors

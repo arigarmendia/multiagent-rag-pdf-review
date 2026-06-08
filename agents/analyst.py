@@ -1,18 +1,22 @@
 import json
 import os
 import time
-from groq import Groq
-from dotenv import load_dotenv
 from pydantic import BaseModel
 from preprocessing.pattern_detector import PatternMatch
 from preprocessing.layout_analyzer import LayoutError
 from preprocessing.table_analyzer import TableError
 from rag.retriever import retrieve
 import mlflow
+from pipeline.token_tracker import add
+from openai import OpenAI
+from dotenv import load_dotenv
 
 load_dotenv()
 
-client = Groq(api_key=os.getenv("PLN3_GROQ_API_KEY"))
+client = OpenAI(
+    base_url=os.getenv("VLLM_BASE_URL", "http://192.168.1.217:8000/v1"),
+    api_key="not-required"
+)
 
 
 class CandidateError(BaseModel):
@@ -43,50 +47,40 @@ def build_prompt(
     ]) or "Ninguno"
 
     table_str = "\n".join([
-        f"- [{e.error_type}] {e.description}"
+        f"- Tabla detectada en página {e.page_number} por modelo de visión."
         for e in table_errors
     ]) or "Ninguno"
 
-    return f"""Sos un corrector experto de memorias académicas de posgrado en español.
+    return f"""Sos un corrector de memorias académicas de posgrado en español.
 
-Analizá la siguiente información de la página {page_number} y determiná qué errores son reales según las reglas académicas del LSE-FIUBA.
+Tu tarea es analizar ÚNICAMENTE los patrones detectados automáticamente. NO busques errores adicionales en el texto.
 
-REGLAS RELEVANTES DEL REGLAMENTO:
+REGLAS LSE:
 {rag_context}
 
-PATRONES DETECTADOS AUTOMÁTICAMENTE:
+PATRONES DETECTADOS:
 {patterns_str}
 
-ERRORES DE FORMATO (márgenes):
+ERRORES DE FORMATO:
 {layout_str}
 
 TABLAS DETECTADAS:
 {table_str}
 
-TEXTO DE LA PÁGINA:
-<texto>
-{text[:1500]}
-</texto>
+Si hay tablas detectadas, SIEMPRE generá una advertencia para verificación manual del caption y formato.
+Si no hay patrones ni tablas ni errores de formato, devolvé [].
 
-Buscá específicamente estos tipos de errores:
-1. Gerundios de posterioridad usados incorrectamente
-2. Uso anafórico incorrecto de "el mismo/la misma", "el cual/la cual"
-3. Palabras que deberían llevar tilde y no la tienen (ej: "metodo" → "método", "numero" → "número", "analisis" → "análisis", "automaticamente" → "automáticamente", "unicamente" → "únicamente")
-4. Errores de formato y márgenes
-5. Problemas con tablas
-
-Respondé SOLO con una lista JSON con este formato exacto, sin texto adicional:
+Respondé SOLO con JSON:
 [
   {{
-    "error_type": "tipo de error",
-    "description": "descripción clara del error",
-    "context": "fragmento donde aparece"
+    "error_type": "tipo",
+    "description": "descripción concisa",
+    "context": "fragmento exacto del texto o '[tabla detectada en página {page_number}]'"
   }}
-]
+]"""
 
-Si no hay errores reales respondé con: []"""
 
-@mlflow.trace(name="analyst") # Using this decorator to automatically trace this function.
+@mlflow.trace(name="analyst")
 def run_analyst(
     page_number: int,
     text: str,
@@ -95,13 +89,33 @@ def run_analyst(
     table_errors: list[TableError],
 ) -> list[CandidateError]:
 
-    query_parts = [p.pattern_type for p in patterns]
+    # Generar errores de tabla directamente sin LLM
+    results = []
+    for table in table_errors:
+        results.append(CandidateError(
+            page_number=page_number,
+            error_type=table.error_type,
+            description=table.description,
+            context=f"[tabla en página {page_number}]",
+            source="analyst"
+        ))
+
+    # Si no hay patrones ni layout errors, devolver solo las advertencias de tablas
+    if not patterns and not layout_errors:
+        return results
+
+
+    query_parts = list(set([p.pattern_type for p in patterns]))
     if layout_errors:
         query_parts.append("márgenes formato")
-    if table_errors:
-        query_parts.append("tablas caption formato")
+    for table in table_errors:
+        if "margen" in table.error_type:
+            query_parts.append("tabla fuera de margen")
+        else:
+            query_parts.append("tablas caption formato")
 
     query = " ".join(query_parts) if query_parts else "reglas generales escritura académica"
+    print(f"RAG QUERY: {query}")
 
     rag_chunks = retrieve(query, k=3)
     rag_context = "\n\n".join([c.content for c in rag_chunks])
@@ -110,7 +124,7 @@ def run_analyst(
 
     start_time = time.time()
     response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
+        model=os.getenv("VLLM_MODEL", "qwen2.5-vl-32b"),
         messages=[{"role": "user", "content": prompt}],
         temperature=0,
         max_tokens=1000
@@ -118,13 +132,17 @@ def run_analyst(
     latency = time.time() - start_time
 
     content = response.choices[0].message.content.strip()
+    if content.startswith("```"):
+        content = content.split("```")[1]
+        if content.startswith("json"):
+            content = content[4:]
+        content = content.strip()
 
     try:
         errors_raw = json.loads(content)
     except json.JSONDecodeError:
         errors_raw = []
 
-    # Logs desired metrics in MLflow
     span = mlflow.get_current_active_span()
     if span:
         span.set_attributes({
@@ -133,7 +151,9 @@ def run_analyst(
             "total_tokens": response.usage.total_tokens,
             "latency_seconds": round(latency, 2),
             "errors_found": len(errors_raw)
-    })
+        })
+
+    add(response.usage.prompt_tokens, response.usage.completion_tokens)
 
     return [
         CandidateError(

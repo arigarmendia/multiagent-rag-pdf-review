@@ -1,4 +1,6 @@
 import re
+import mlflow
+import time
 from pydantic import BaseModel
 
 
@@ -15,7 +17,7 @@ PROBLEMATIC_GERUNDS = [
 ]
 
 ANAPHORA_PATTERNS = [
-    "el cual", "lo cual", "la cual", "los cuales", "las cuales",
+    "el cual", "la cual", "los cuales", "las cuales",
     "el mismo", "la misma", "los mismos", "las mismas"
 ]
 
@@ -50,8 +52,24 @@ def detect_anaphora(text: str, page_number: int) -> list[PatternMatch]:
     return matches
 
 
+@mlflow.trace(name="pattern_detector")
 def detect_patterns(text: str, page_number: int) -> list[PatternMatch]:
+    start_time = time.time()
+
     matches = []
     matches.extend(detect_gerunds(text, page_number))
     matches.extend(detect_anaphora(text, page_number))
+
+    latency = time.time() - start_time
+
+    span = mlflow.get_current_active_span()
+    if span:
+        span.set_attributes({
+            "page_number": page_number,
+            "gerunds_found": len([m for m in matches if m.pattern_type == "gerundio"]),
+            "anaphora_found": len([m for m in matches if m.pattern_type == "anáfora"]),
+            "total_patterns_found": len(matches),
+            "detection_latency_seconds": round(latency, 4)
+        })
+
     return matches

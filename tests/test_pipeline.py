@@ -1,10 +1,15 @@
 from pipeline.processor import process_pdf
+import fitz
 
 def test_pipeline():
-    from preprocessing.pdf_extractor import extract_pdf
-    
-    # Solo procesamos 2 páginas para el test
-    result = process_pdf("data/sample_pdfs/test.pdf")
+    src = fitz.open("data/sample_pdfs/test.pdf")
+    doc = fitz.open()
+    doc.insert_pdf(src, from_page=0, to_page=2)
+    doc.save("data/sample_pdfs/test_3pages.pdf")
+    src.close()
+    doc.close()
+
+    result = process_pdf("data/sample_pdfs/test_3pages.pdf")
 
     print(f"\nPDF: {result.pdf_path}")
     print(f"Páginas procesadas: {result.total_pages}")
@@ -12,7 +17,7 @@ def test_pipeline():
     print(f"Tiempo total: {result.total_processing_time}s")
     print()
 
-    for page in result.pages[:2]:
+    for page in result.pages:
         print(f"--- Página {page.page_number} ({page.processing_time}s) ---")
         confirmed = [e for e in page.confirmed_errors if e.confirmed]
         if confirmed:

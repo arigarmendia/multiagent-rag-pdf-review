@@ -7,10 +7,16 @@ from agents.analyst import CandidateError
 from rag.retriever import retrieve
 import mlflow
 import time
+from pipeline.token_tracker import add
+from openai import OpenAI
 
 load_dotenv()
 
-client = Groq(api_key=os.getenv("PLN3_GROQ_API_KEY"))
+# client = Groq(api_key=os.getenv("PLN3_GROQ_API_KEY"))
+client = OpenAI(
+    base_url="http://192.168.1.217:8000/v1",
+    api_key="not-required"
+)
 
 
 class ConfirmedError(BaseModel):
@@ -63,7 +69,7 @@ Respondé SOLO con una lista JSON con este formato exacto, sin texto adicional:
 ]"""
     start_time = time.time()
     response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
+        model="qwen2.5-vl-32b",
         messages=[{"role": "user", "content": prompt}],
         temperature=0,
         max_tokens=1000
@@ -71,6 +77,11 @@ Respondé SOLO con una lista JSON con este formato exacto, sin texto adicional:
     latency = time.time() - start_time
 
     content = response.choices[0].message.content.strip()
+    if content.startswith("```"):
+        content = content.split("```")[1]
+        if content.startswith("json"):
+            content = content[4:]
+        content = content.strip()
 
     try:
         errors_raw = json.loads(content)
@@ -86,6 +97,8 @@ Respondé SOLO con una lista JSON con este formato exacto, sin texto adicional:
             "latency_seconds": round(latency, 2),
             "errors_found": len(errors_raw)
     })
+    # Custom function to track total tokens for each pipeline run
+    add(response.usage.prompt_tokens, response.usage.completion_tokens)
 
     return [
         ConfirmedError(

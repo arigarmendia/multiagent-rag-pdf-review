@@ -1,12 +1,12 @@
 import chromadb
 import re
+import time
+import mlflow
 from pathlib import Path
-from sentence_transformers import SentenceTransformer
 
 CHROMA_PATH = "data/chroma_db"
 COLLECTION_NAME = "reglas_lse"
 
-embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
 client = chromadb.PersistentClient(path=CHROMA_PATH)
 
 
@@ -15,7 +15,12 @@ def chunk_by_section(text: str) -> list[str]:
     return [s.strip() for s in sections if s.strip()]
 
 
+@mlflow.trace(name="indexer")
 def index_document(file_path: str, source_name: str) -> None:
+    from sentence_transformers import SentenceTransformer
+    embedding_model = SentenceTransformer("all-MiniLM-L6-v2", local_files_only=True)
+
+    start_time = time.time()
     text = Path(file_path).read_text(encoding="utf-8")
     chunks = chunk_by_section(text)
 
@@ -31,9 +36,17 @@ def index_document(file_path: str, source_name: str) -> None:
         metadatas=[{"source": source_name} for _ in chunks]
     )
 
+    latency = time.time() - start_time
+
+    span = mlflow.get_current_active_span()
+    if span:
+        span.set_attributes({
+            "source": source_name,
+            "chunks_indexed": len(chunks),
+            "indexing_latency_seconds": round(latency, 3)
+        })
+
     print(f"Indexados {len(chunks)} chunks de '{source_name}'")
-    for i, chunk in enumerate(chunks):
-        print(f"  Chunk {i}: {chunk[:80]}...")
 
 
 def index_all(documents_dir: str = "data/rag_documents") -> None:

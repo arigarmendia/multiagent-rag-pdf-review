@@ -17,6 +17,27 @@ def test_verifier():
             context="El mismo fue probado en condiciones reales.",
             source="analyst"
         ),
+        CandidateError(
+            page_number=1,
+            error_type="Falta de tilde",
+            description="La palabra 'metodo' debería ser 'método'",
+            context="El metodo utilizado fue validado por expertos.",
+            source="analyst"
+        ),
+        CandidateError(
+            page_number=1,
+            error_type="Tilde incorrecta",
+            description="La palabra 'imágen' lleva tilde incorrectamente, debe ser 'imagen'",
+            context="Se muestra en la imágen siguiente.",
+            source="analyst"
+        ),
+        CandidateError(
+            page_number=5,
+            error_type="tabla detectada",
+            description="1 tabla detectada en la página — verificar caption y formato",
+            context="Tabla sin caption visible",
+            source="analyst"
+        ),
     ]
 
     confirmed = run_verifier(candidates)
