@@ -91,8 +91,8 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("AcademiCheck")
-st.markdown("##### Revisión automática de memorias académicas")
+st.title("Revisor virtual")
+st.markdown("##### Sistema de revisión automática")
 st.divider()
 
 # Estado de sesión
@@ -104,7 +104,7 @@ if "confirmed_errors" not in st.session_state:
 # Upload
 col1, col2 = st.columns([2, 1])
 with col1:
-    uploaded_file = st.file_uploader("Subí tu memoria en PDF", type=["pdf"])
+    uploaded_file = st.file_uploader("Subir archivo de la memoria (PDF)", type=["pdf"])
 
 if uploaded_file is not None:
     file_id = f"{uploaded_file.name}_{uploaded_file.size}"

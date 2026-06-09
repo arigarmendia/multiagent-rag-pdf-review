@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 client = OpenAI(
-    base_url=os.getenv("VLLM_BASE_URL", "http://192.168.1.217:8000/v1"),
+    base_url=os.getenv("VLLM_BASE_URL"),
     api_key="not-required"
 )
 
@@ -32,7 +32,6 @@ def build_prompt(
     text: str,
     patterns: list[PatternMatch],
     layout_errors: list[LayoutError],
-    table_errors: list[TableError],
     rag_context: str
 ) -> str:
 
@@ -44,11 +43,6 @@ def build_prompt(
     layout_str = "\n".join([
         f"- [{e.error_type}] {e.description}"
         for e in layout_errors
-    ]) or "Ninguno"
-
-    table_str = "\n".join([
-        f"- Tabla detectada en página {e.page_number} por modelo de visión."
-        for e in table_errors
     ]) or "Ninguno"
 
     return f"""Sos un corrector de memorias académicas de posgrado en español.
@@ -64,18 +58,14 @@ PATRONES DETECTADOS:
 ERRORES DE FORMATO:
 {layout_str}
 
-TABLAS DETECTADAS:
-{table_str}
-
-Si hay tablas detectadas, SIEMPRE generá una advertencia para verificación manual del caption y formato.
-Si no hay patrones ni tablas ni errores de formato, devolvé [].
+Si no hay patrones ni errores de formato, devolvé [].
 
 Respondé SOLO con JSON:
 [
   {{
     "error_type": "tipo",
     "description": "descripción concisa",
-    "context": "fragmento exacto del texto o '[tabla detectada en página {page_number}]'"
+    "context": "fragmento exacto del texto"
   }}
 ]"""
 
@@ -100,10 +90,9 @@ def run_analyst(
             source="analyst"
         ))
 
-    # Si no hay patrones ni layout errors, devolver solo las advertencias de tablas
+    # Si no hay patrones ni layout errors, devolver solo los errores de tabla
     if not patterns and not layout_errors:
         return results
-
 
     query_parts = list(set([p.pattern_type for p in patterns]))
     if layout_errors:
@@ -120,7 +109,7 @@ def run_analyst(
     rag_chunks = retrieve(query, k=3)
     rag_context = "\n\n".join([c.content for c in rag_chunks])
 
-    prompt = build_prompt(page_number, text, patterns, layout_errors, table_errors, rag_context)
+    prompt = build_prompt(page_number, text, patterns, layout_errors, rag_context)
 
     start_time = time.time()
     response = client.chat.completions.create(
@@ -139,9 +128,9 @@ def run_analyst(
         content = content.strip()
 
     try:
-        errors_raw = json.loads(content)
+        llm_errors = json.loads(content)
     except json.JSONDecodeError:
-        errors_raw = []
+        llm_errors = []
 
     span = mlflow.get_current_active_span()
     if span:
@@ -150,12 +139,13 @@ def run_analyst(
             "completion_tokens": response.usage.completion_tokens,
             "total_tokens": response.usage.total_tokens,
             "latency_seconds": round(latency, 2),
-            "errors_found": len(errors_raw)
+            "errors_found": len(llm_errors)
         })
 
     add(response.usage.prompt_tokens, response.usage.completion_tokens)
 
-    return [
+    # Combinar errores de tabla (directos) con errores del LLM (patrones)
+    results.extend([
         CandidateError(
             page_number=page_number,
             error_type=e.get("error_type", ""),
@@ -163,5 +153,7 @@ def run_analyst(
             context=e.get("context", "") if isinstance(e.get("context"), str) else "",
             source="analyst"
         )
-        for e in errors_raw
-    ]
+        for e in llm_errors
+    ])
+
+    return results

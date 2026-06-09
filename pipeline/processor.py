@@ -9,6 +9,7 @@ from agents.analyst import run_analyst, CandidateError
 from agents.verifier import run_verifier, ConfirmedError
 from pipeline.token_tracker import reset, get
 from security.guardrails_validator import validate_and_log_input, validate_and_log_output
+from evaluation.metrics import calculate_metrics
 
 # Token counter reset at the start of each pipeline run
 reset()
@@ -130,6 +131,19 @@ def process_pdf(pdf_path: str) -> PipelineResult:
         
         # Log the token counts for the entire pipeline run
         mlflow.log_metrics(get())
+
+        # Calculate and log precision, recall, f1 if ground truth exists
+        metrics = calculate_metrics(
+            pdf_name=pdf_path,
+            confirmed_errors=[e for p in page_results for e in p.confirmed_errors]
+        )
+        if metrics.get("precision") is not None:
+            mlflow.log_metrics({
+                "precision": metrics["precision"],
+                "recall": metrics["recall"],
+                "f1": metrics["f1"],
+                "true_positives": metrics["true_positives"],
+            })
 
     return PipelineResult(
         pdf_path=pdf_path,
