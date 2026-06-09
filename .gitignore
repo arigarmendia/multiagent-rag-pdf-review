@@ -225,6 +225,7 @@ data/*
 
 # MLflow
 mlruns/
+*.db
 
 # ChromaDB
 chroma_db/
@@ -235,3 +236,4 @@ data/sample_pdfs/
 
 # UV lock
 uv.lock
+
