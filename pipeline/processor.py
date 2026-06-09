@@ -94,7 +94,13 @@ def process_pdf(pdf_path: str) -> PipelineResult:
                 confirmed_errors=confirmed,
                 processing_time=round(page_time, 2)
             ))
-
+        
+        # Calculate faithfulness:
+        total_candidates = sum(len(p.candidate_errors) for p in page_results)
+        total_confirmed = sum(len([e for e in p.confirmed_errors if e.confirmed]) for p in page_results)
+        
+        faithfulness = round(total_confirmed / total_candidates, 3) if total_candidates > 0 else 1.0
+        
         total_errors = sum(
             len([e for e in p.confirmed_errors if e.confirmed])
             for p in page_results
@@ -114,7 +120,10 @@ def process_pdf(pdf_path: str) -> PipelineResult:
             "total_errors": total_errors,
             "total_processing_time": total_time,
             "pages_with_no_errors": pages_with_no_errors,
-            "correct_abstention_rate": correct_abstention_rate
+            "correct_abstention_rate": correct_abstention_rate,
+            "total_candidates": total_candidates,
+            "total_confirmed": total_confirmed,
+            "faithfulness": faithfulness
         })
 
         mlflow.log_param("pdf_path", pdf_path)
