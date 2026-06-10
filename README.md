@@ -61,21 +61,23 @@ Configure the desired backend and any required API keys or endpoints before runn
 Run the main application:
 
 ```bash
-python main.py
+uv run streamlit run app/main.py
 ```
-
 Or execute the appropriate entry point for the workflow you want to test.
 
 ## Repository
 
 ```
-multiagent-rag-pdf-review/
-├── agents/
-├── data/
-├── tests/
-├── docker-compose.yml
-├── main.py
-└── ...
+agents/            # Multi-agent logic (analyst, verifier)
+app/               # User interface
+preprocessing/     # PDF parsing and structure extraction
+pipeline/          # Core processing pipeline
+rag/               # Indexing and retrieval logic
+security/          # Guardrails validation
+evaluation/        # Metrics and evaluation tools
+data/              # PDFs, preprocessed data, ChromaDB, test data
+tests/             # Unit and integration tests
+docker-compose.yml # Optional Ollama LLM backend
 ```
 
 ## Contact
