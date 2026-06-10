@@ -28,8 +28,6 @@ class CandidateError(BaseModel):
 
 
 def build_prompt(
-    page_number: int,
-    text: str,
     patterns: list[PatternMatch],
     layout_errors: list[LayoutError],
     rag_context: str

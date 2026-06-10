@@ -55,7 +55,7 @@ def retrieve(query: str, k: int = 3) -> list[RetrievedChunk]:
     latency = time.time() - start_time
     avg_distance = round(sum(c.distance for c in chunks) / len(chunks), 4) if chunks else 0
     hit_count = len([c for c in chunks if c.distance < RELEVANCE_THRESHOLD])
-    hit_rate = round(hit_count / len(chunks), 3) if chunks else 0
+    precision_at_k = round(hit_count / len(chunks), 3) if chunks else 0
 
     span = mlflow.get_current_active_span()
     if span:
@@ -64,7 +64,7 @@ def retrieve(query: str, k: int = 3) -> list[RetrievedChunk]:
             "chunks_retrieved": len(chunks),
             "avg_distance": avg_distance,
             "hit_count": hit_count,
-            "hit_rate": hit_rate,
+            "precision_at_k": precision_at_k,
             "relevance_threshold": RELEVANCE_THRESHOLD,
             "query": query
         })
