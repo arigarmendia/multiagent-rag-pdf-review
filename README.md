@@ -1,11 +1,11 @@
 ## Multi-Agent RAG PDF document review sistem (Spanish)
 
-A multi-agent Retrieval-Augmented Generation (RAG) system for reviewing and analyzing PDF documents using multiple AI agents.
+The project is a multi-agent pipeline with Retrieval-Augmented Generation (RAG) for automatically detecting errors in academic PDF documents.
 
 
 ## What is it?
 
-This project implements a multi-agent workflow for PDF document review. Documents are processed and indexed, allowing specialized agents to retrieve relevant context and collaborate on analysis tasks.
+This project implements a multi-agent workflow for PDF document review. Documents are processed and indexed, allowing specialized agents allowing specialized agents to perform analysis and validation tasks.
 
 It supports OpenAI-compatible endpoints, including local servers such as vLLM and Ollama, as well as Groq.
 
@@ -16,7 +16,8 @@ It supports OpenAI-compatible endpoints, including local servers such as vLLM an
 
 - Python 3.11+
 - Docker and Docker Compose (if using a local deployment)
-- `uv` (recommended) or `pip`
+- `uv` (recommended)
+- Groq (optional) and Guardrails AI API keys 
 
 ## Installation
 
@@ -33,13 +34,7 @@ Install the Python dependencies:
 uv sync
 ```
 
-Alternatively:
-
-```bash
-pip install -r requirements.txt
-```
-
-Start the required services:
+Start the required services (if running Ollama locally):
 
 ```bash
 docker compose up -d
@@ -63,7 +58,12 @@ Run the main application:
 ```bash
 uv run streamlit run app/main.py
 ```
-Or execute the appropriate entry point for the workflow you want to test.
+Or execute the appropriate entry point for the workflow you want to test, for example:
+
+```bash
+uv run pytest tests/test_pipeline.py
+```
+
 
 ## Repository
 
