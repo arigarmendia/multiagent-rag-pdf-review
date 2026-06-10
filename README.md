@@ -1,6 +1,6 @@
 ## Multi-Agent RAG PDF document review sistem (Spanish)
 
-The project is a multi-agent pipeline with Retrieval-Augmented Generation (RAG) for automatically detecting errors in academic PDF documents.
+The project is a multi-agent pipeline with Retrieval-Augmented Generation (RAG) for automatically detecting errors in academic PDF documents written in Spanish.
 
 
 ## What is it?
